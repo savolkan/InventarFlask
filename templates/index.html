@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Inventar</title>
+
+  <style>
+    body { font-family: system-ui, Arial; margin: 24px; }
+    h1 { margin-bottom: 10px; }
+    .topbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    input[type="search"] { padding: 10px 12px; min-width: 260px; }
+    button { padding: 10px 14px; cursor: pointer; }
+    .list { margin-top: 18px; border: 1px solid #ddd; border-radius: 10px; overflow: hidden; }
+    .row {
+      display: grid;
+      grid-template-columns: 32px auto 1fr 100px;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 12px;
+      border-top: 1px solid #eee;
+      background: #fff;
+    }
+    .row:first-child { border-top: none; }
+    .handle { cursor: grab; user-select: none; font-size: 18px; opacity: .7; }
+    .name { font-weight: 600; }
+    .qty { display:flex; gap:8px; justify-content: flex-end; align-items:center; }
+    .qty input { width: 90px; padding: 8px 10px; text-align: right; }
+    .status { margin-left: 8px; font-size: 13px; opacity: .8; }
+    .hint { margin-top: 10px; font-size: 13px; opacity: .75; }
+  </style>
+
+  <!-- SortableJS (Drag&Drop) -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+</head>
+<body>
+  <h1>Inventar</h1>
+
+  <div class="topbar">
+    <input id="search" type="search" placeholder="Suchen…" />
+    <button id="saveBtn">Fertig / Speichern</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="hint">Zieh am ☰ zum Sortieren. Stückzahl direkt im Feld ändern.</div>
+
+  <div class="list" id="list">
+    {% for it in items %}
+      <div class="row" data-id="{{ it.id }}" data-name="{{ it.name|lower }}">
+        <div class="handle">☰</div>
+        <div class="name">{{ it.name }}</div>
+        <div class="qty">
+          <input type="number" min="0" step="1" value="{{ it.qty }}" />
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    const listEl = document.getElementById("list");
+    const statusEl = document.getElementById("status");
+
+    // Drag & Drop
+    new Sortable(listEl, {
+      handle: ".handle",
+      animation: 150
+    });
+
+    // Suche (einfacher Filter)
+    document.getElementById("search").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      for (const row of listEl.querySelectorAll(".row")) {
+        const name = row.dataset.name || "";
+        row.style.display = name.includes(q) ? "" : "none";
+      }
+    });
+
+    function collectItemsInCurrentOrder() {
+      // Auch gefilterte Elemente sollen gespeichert werden => display egal
+      const rows = Array.from(listEl.querySelectorAll(".row"));
+
+      return rows.map(r => ({
+        id: Number(r.dataset.id),
+        qty: Number(r.querySelector("input").value || 0)
+      }));
+    }
+
+    async function save() {
+      statusEl.textContent = "Speichere…";
+      const items = collectItemsInCurrentOrder();
+
+      const res = await fetch("/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items })
+      });
+
+      if (!res.ok) {
+        statusEl.textContent = "Fehler beim Speichern.";
+        return;
+      }
+
+      statusEl.textContent = "Gespeichert ✅";
+      setTimeout(() => statusEl.textContent = "", 2000);
+    }
+
+    document.getElementById("saveBtn").addEventListener("click", save);
+  </script>
+</body>
+</html>
+
+
